@@ -401,3 +401,23 @@ pwmValue.innerText = val
 }
 
 })
+/*{
+  "ESP32": {
+    "SENSOR": {
+      "temperature": 0,
+      "humidity": 0
+    },
+    "GPIO1": {
+      "state": "off"
+    },
+    "GPIO2": {
+      "state": "off",
+      "pwm": 0
+    },
+    "SCHEDULE": {
+      "active": false,
+      "start": 480,
+      "stop": 1020
+    }
+  }
+}*/
