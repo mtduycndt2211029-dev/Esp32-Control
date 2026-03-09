@@ -1,3 +1,5 @@
+/* ------------------- LOGIN CSS ------------------- */
+/* BODY & CARD CHO LOGIN */
 body {
   margin:0;
   font-family:"Segoe UI",sans-serif;
@@ -9,7 +11,8 @@ body {
   min-height:100vh;
 }
 
-.dashboard-card {
+/* CARD chung login & dashboard */
+.card, .dashboard-card {
   width:400px;
   max-width:95%;
   padding:25px;
@@ -20,8 +23,10 @@ body {
   text-align:center;
 }
 
+/* Tiêu đề */
 h1{margin-bottom:10px;font-size:26px;}
 
+/* STATUS BADGE */
 .status-badge{
   display:inline-block;
   padding:6px 15px;
@@ -32,6 +37,76 @@ h1{margin-bottom:10px;font-size:26px;}
 .online{background:#4caf50;}
 .offline{background:#e53935;}
 
+/* ------------------- LOGIN BOX ------------------- */
+#authBox {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+#authBox input {
+  width: 90%;
+  padding: 14px;
+  margin: 10px 0;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  background: rgba(255,255,255,0.18);
+  color: white;
+  text-align: center;
+}
+
+#authBox input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* LOGIN BUTTON */
+#authBox .btn.login-btn {
+  width: 92%;
+  padding: 14px;
+  margin-top: 15px;
+  border-radius: 12px;
+  border: none;
+  font-size: 17px;
+  cursor: pointer;
+  color: white;
+  font-weight: 600;
+
+  background: linear-gradient(135deg, #03a9f4, #0277bd);
+  transition: 0.25s ease;
+  box-shadow: 0 6px 18px rgba(3, 169, 244, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ripple effect */
+#authBox .btn.login-btn:active::after {
+  content: "";
+  position: absolute;
+  width: 180%;
+  height: 180%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.4);
+  border-radius: 50%;
+  animation: ripple 0.5s ease-out;
+}
+
+@keyframes ripple {
+  from { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
+  to   { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+}
+
+/* AUTH MESSAGE */
+#authMsg {
+  margin-top: 10px;
+  color: #ffb3b3;
+  font-size: 14px;
+}
+
+/* ------------------- DASHBOARD CSS ------------------- */
 /* Sensor cards */
 .sensor-container{display:flex;gap:10px;margin-bottom:20px;}
 .sensor-card{
@@ -133,9 +208,10 @@ h1{margin-bottom:10px;font-size:26px;}
 
 /* Applied Time */
 #appliedTime{
+  margin-top:10px;
   font-size:16px;
-  color:#cfcfcf;
-  text-align:center;
+  color:#9be7ff;
+  font-weight:600;
 }
 
 /* Responsive */
@@ -144,12 +220,7 @@ h1{margin-bottom:10px;font-size:26px;}
   .time-row{flex-direction:column;}
   .time-select{flex-direction:row;}
 }
-#appliedTime{
-margin-top:10px;
-font-size:16px;
-color:#9be7ff;
-font-weight:600;
-}
+
 
 
 
