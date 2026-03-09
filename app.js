@@ -333,7 +333,9 @@ stop:scheduleStop
 cancelBtn.onclick = ()=>{
 
 set(ref(db,"ESP32/SCHEDULE/active"),false)
+appliedTime.style.display="none"
 
+setGPIO2(false)
 }
 
 
@@ -420,3 +422,4 @@ pwmValue.innerText = val
 }
 
 })
+
