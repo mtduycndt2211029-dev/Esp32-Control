@@ -36,6 +36,10 @@ const app = initializeApp(firebaseConfig)
 const db = getDatabase(app)
 const auth = getAuth(app)
 
+let scheduleActive = false
+let scheduleStart = 0
+let scheduleStop = 0
+
 
 // =====================
 // LOGIN UI
@@ -217,8 +221,6 @@ set(ref(db,"ESP32/GPIO1/state"),state)
 // GPIO2 FUNCTION
 // =====================
 
-let scheduleActive = false
-
 function setGPIO2(on){
 
 const state = on ? "on":"off"
@@ -252,19 +254,16 @@ const now = new Date()
 
 const current = now.getHours()*60 + now.getMinutes()
 
-const start = parseInt(startHour.value)*60 + parseInt(startMin.value)
-const stop = parseInt(stopHour.value)*60 + parseInt(stopMin.value)
+let on = false
 
-let on=false
+if(scheduleStart <= scheduleStop){
 
-if(start<=stop){
-
-on = current>=start && current<=stop
+on = current >= scheduleStart && current <= scheduleStop
 
 }
 else{
 
-on = current>=start || current<=stop
+on = current >= scheduleStart || current <= scheduleStop
 
 }
 
@@ -283,6 +282,9 @@ applyBtn.onclick = ()=>{
 
 scheduleActive = true
 
+scheduleStart = parseInt(startHour.value)*60 + parseInt(startMin.value)
+scheduleStop = parseInt(stopHour.value)*60 + parseInt(stopMin.value)
+
 const sh=startHour.value.padStart(2,"0")
 const sm=startMin.value.padStart(2,"0")
 
@@ -290,7 +292,6 @@ const eh=stopHour.value.padStart(2,"0")
 const em=stopMin.value.padStart(2,"0")
 
 appliedTime.innerText = `Schedule Applied: ${sh}:${sm} → ${eh}:${em}`
-
 appliedTime.style.display="block"
 
 updateSchedule()
