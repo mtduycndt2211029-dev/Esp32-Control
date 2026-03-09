@@ -292,12 +292,12 @@ let on = false
 
 if(scheduleStart <= scheduleStop){
 
-on = current >= scheduleStart && current <= scheduleStop
+on = current >= scheduleStart && current < scheduleStop
 
 }
 else{
 
-on = current >= scheduleStart || current <= scheduleStop
+on = current >= scheduleStart || current < scheduleStop
 
 }
 
@@ -422,4 +422,5 @@ pwmValue.innerText = val
 }
 
 })
+
 
