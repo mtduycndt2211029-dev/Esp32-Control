@@ -165,6 +165,40 @@ humValue.innerText = data.humidity + " %"
 
 
 // =====================
+// REALTIME SCHEDULE
+// =====================
+
+onValue(ref(db,"ESP32/SCHEDULE"),(snapshot)=>{
+
+const data = snapshot.val()
+
+if(!data) return
+
+scheduleActive = data.active
+scheduleStart = data.start
+scheduleStop = data.stop
+
+if(scheduleActive){
+
+const sh = Math.floor(scheduleStart/60).toString().padStart(2,"0")
+const sm = (scheduleStart%60).toString().padStart(2,"0")
+
+const eh = Math.floor(scheduleStop/60).toString().padStart(2,"0")
+const em = (scheduleStop%60).toString().padStart(2,"0")
+
+appliedTime.innerText = `Schedule: ${sh}:${sm} → ${eh}:${em}`
+appliedTime.style.display="block"
+
+}else{
+
+appliedTime.style.display="none"
+
+}
+
+})
+
+
+// =====================
 // TIME DROPDOWN
 // =====================
 
@@ -280,21 +314,14 @@ setInterval(updateSchedule,1000)
 
 applyBtn.onclick = ()=>{
 
-scheduleActive = true
-
 scheduleStart = parseInt(startHour.value)*60 + parseInt(startMin.value)
 scheduleStop = parseInt(stopHour.value)*60 + parseInt(stopMin.value)
 
-const sh=startHour.value.padStart(2,"0")
-const sm=startMin.value.padStart(2,"0")
-
-const eh=stopHour.value.padStart(2,"0")
-const em=stopMin.value.padStart(2,"0")
-
-appliedTime.innerText = `Schedule Applied: ${sh}:${sm} → ${eh}:${em}`
-appliedTime.style.display="block"
-
-updateSchedule()
+set(ref(db,"ESP32/SCHEDULE"),{
+active:true,
+start:scheduleStart,
+stop:scheduleStop
+})
 
 }
 
@@ -305,11 +332,7 @@ updateSchedule()
 
 cancelBtn.onclick = ()=>{
 
-scheduleActive = false
-
-appliedTime.style.display="none"
-
-setGPIO2(false)
+set(ref(db,"ESP32/SCHEDULE/active"),false)
 
 }
 
@@ -320,21 +343,17 @@ setGPIO2(false)
 
 manualOnBtn.onclick = ()=>{
 
-scheduleActive = false
-
 setGPIO2(true)
 
-appliedTime.style.display="none"
+set(ref(db,"ESP32/SCHEDULE/active"),false)
 
 }
 
 manualOffBtn.onclick = ()=>{
 
-scheduleActive = false
-
 setGPIO2(false)
 
-appliedTime.style.display="none"
+set(ref(db,"ESP32/SCHEDULE/active"),false)
 
 }
 
@@ -401,23 +420,3 @@ pwmValue.innerText = val
 }
 
 })
-/*{
-  "ESP32": {
-    "SENSOR": {
-      "temperature": 0,
-      "humidity": 0
-    },
-    "GPIO1": {
-      "state": "off"
-    },
-    "GPIO2": {
-      "state": "off",
-      "pwm": 0
-    },
-    "SCHEDULE": {
-      "active": false,
-      "start": 480,
-      "stop": 1020
-    }
-  }
-}*/
