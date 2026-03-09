@@ -9,10 +9,16 @@ set,
 onValue
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"
 
+import {
+getAuth,
+signInWithEmailAndPassword,
+onAuthStateChanged,
+signOut
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"
+
 
 // ===== FIREBASE CONFIG =====
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyA_bXUugzjP7uR_CIrhBdpbkZhg5f2Al5o",
   authDomain: "esp32-control-e48e5.firebaseapp.com",
@@ -28,6 +34,84 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 const db = getDatabase(app)
+const auth = getAuth(app)
+
+
+// =====================
+// LOGIN UI
+// =====================
+
+const authBox = document.getElementById("authBox")
+const controlBox = document.getElementById("controlBox")
+
+const loginBtn = document.getElementById("loginBtn")
+const logoutBtn = document.getElementById("logoutBtn")
+
+const authMsg = document.getElementById("authMsg")
+const badge = document.getElementById("statusBadge")
+
+
+// =====================
+// LOGIN
+// =====================
+
+loginBtn.onclick = async ()=>{
+
+authMsg.innerText=""
+
+try{
+
+await signInWithEmailAndPassword(
+auth,
+document.getElementById("emailField").value,
+document.getElementById("passwordField").value
+)
+
+}catch(e){
+
+authMsg.innerText = e.message
+
+}
+
+}
+
+
+// =====================
+// LOGOUT
+// =====================
+
+logoutBtn.onclick = ()=>{
+
+signOut(auth)
+
+}
+
+
+// =====================
+// AUTH STATE
+// =====================
+
+onAuthStateChanged(auth,(user)=>{
+
+if(user){
+
+authBox.style.display="none"
+controlBox.style.display="block"
+
+badge.className="status-badge online"
+badge.innerText="Online"
+
+}else{
+
+authBox.style.display="block"
+controlBox.style.display="none"
+
+badge.className="status-badge offline"
+badge.innerText="Offline"
+
+}
+
+})
 
 
 // ===== UI ELEMENTS =====
@@ -188,7 +272,7 @@ setGPIO2(on)
 
 }
 
-setInterval(updateSchedule,60000)
+setInterval(updateSchedule,1000)
 
 
 // =====================
