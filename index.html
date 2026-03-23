@@ -1,135 +1,119 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>ESP32 Dashboard</title>
 
-<link rel="stylesheet" href="styles.css">
-<script type="module" src="app.js" defer></script>
+<link rel="stylesheet" href="style.css">
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
 <body>
 
-<div class="dashboard-card">
+<!-- LOGIN -->
+<div id="authBox" class="login">
+  <div class="login-box">
+    <h2>ESP32 Login</h2>
+    <input id="emailField" placeholder="Email" type="email">
+    <input id="passwordField" type="password" placeholder="Password">
+    <button id="loginBtn">Login</button>
+    <div id="loginError" class="error"></div>
+  </div>
+</div>
 
-<h1>ESP32 GPIO Control</h1>
-<div id="statusBadge" class="status-badge offline">Offline</div>
+<!-- MAIN APP -->
+<div id="app" style="display:none;">
 
-<!-- LOGIN UI -->
-<div id="authBox">
+  <div class="nav">
+    <button id="navDash">🏠 Dashboard</button>
+    <button id="navChart">📊 Chart</button>
+    <button id="navHistory">📁 History</button>
+    <button id="logoutBtn">⎋ Logout</button>
+  </div>
 
-<input id="emailField" type="email" placeholder="Email">
-<input id="passwordField" type="password" placeholder="Password">
+  <div id="dash" class="page">
 
-<button id="loginBtn" class="btn login-btn">Login</button>
+    <div class="sensor">
+      <div class="circle">
+        <h1 id="temp">--°C</h1>
+        <p id="hum">--%</p>
+      </div>
+    </div>
 
-<p id="authMsg"></p>
+    <div class="card center">
+      <h3>GPIO1 Light</h3>
+      <div id="bulb" class="bulb off"></div>
+      <div class="btn-group">
+        <button id="g1On">ON</button>
+        <button id="g1Off">OFF</button>
+      </div>
+    </div>
+
+    <div class="card center">
+      <h3>GPIO2 Control</h3>
+ <div id="gpio2Lamp" class="bulb off"></div>
+      <div class="btn-group">
+        <button id="manualMode">Manual</button>
+        <button id="scheduleMode">Schedule</button>
+      </div>
+
+      <div class="center">
+        <label>PWM:</label>
+        <input type="range" id="pwmSlider" min="0" max="255">
+        <span id="pwmValue">0</span>
+      </div>
+
+      <div id="manualBox" class="center">
+        <button id="g2On">ON</button>
+        <button id="g2Off">OFF</button>
+      </div>
+
+      <div id="scheduleBox" style="display:none;">
+        <div class="center">
+          Start: <select id="sh"></select>:<select id="sm"></select>
+        </div>
+        <div class="center">
+          Stop: <select id="eh"></select>:<select id="em"></select>
+        </div>
+        <div class="btn-group center">
+          <button id="apply">Apply</button>
+          <button id="cancel">Cancel</button>
+        </div>
+        <div id="scheduleStatus" class="center"></div>
+      </div>
+
+     
+    </div>
+
+  </div>
+
+  <div id="chartPage" class="page" style="display:none;">
+    <canvas id="chart"></canvas>
+  </div>
+
+  <div id="historyPage" class="page" style="display:none;">
+    <input id="fu" placeholder="User">
+    <input id="fe" placeholder="Event">
+    <button id="filter">Filter</button>
+
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Event</th><th>User</th><th>Value</th></tr>
+      </thead>
+      <tbody id="table"></tbody>
+    </table>
+
+    <div class="btn-group center">
+      <button id="export">Export</button>
+      <button id="clearHistory">Clear History</button>
+    </div>
+  </div>
 
 </div>
 
-<!-- CONTROL UI -->
-<div id="controlBox"style="display:none;">
-
-<!-- SENSOR -->
-<div class="sensor-container">
-
-<div class="sensor-card">
-<div class="sensor-title">Temperature</div>
-<div id="tempValue" class="sensor-value">-- °C</div>
-</div>
-
-<div class="sensor-card">
-<div class="sensor-title">Humidity</div>
-<div id="humValue" class="sensor-value">-- %</div>
-</div>
-
-</div>
-
-<!-- GPIO1 -->
-<div class="gpio-card">
-
-<button id="gpio1Btn" class="gpio-button">GPIO1</button>
-<div id="gpio1Status" class="gpio-status">Status: OFF</div>
-
-</div>
-
-<!-- GPIO2 -->
-<div class="gpio-card">
-
-<h3>GPIO2 Setup</h3>
-
-<button id="gpio2Btn" class="gpio-button">GPIO2</button>
-<div id="gpio2Status" class="gpio-status">Status: OFF</div>
-
-<div class="time-row">
-
-<div class="time-group">
-<label>Start Time</label>
-
-<div class="time-select">
-<select id="startHour"></select>
-<select id="startMin"></select>
-</div>
-
-</div>
-
-<div class="time-group">
-<label>Stop Time</label>
-
-<div class="time-select">
-<select id="stopHour"></select>
-<select id="stopMin"></select>
-</div>
-
-</div>
-
-</div>
-
-<div class="pwm-box">
-
-<label>PWM Power</label>
-
-<input type="range" id="pwmSlider" min="0" max="255" value="0">
-
-<div id="pwmValue">0</div>
-
-</div>
-
-<!-- APPLY CANCEL -->
-
-<div class="action-buttons">
-
-<button id="applyBtn" class="btn apply-btn">Apply</button>
-
-<button id="cancelBtn" class="btn cancel-btn">Cancel</button>
-
-</div>
-
-<div id="appliedTime" style="display:none;"></div>
-
-<!-- MANUAL -->
-
-<div class="action-buttons manual-row">
-
-<button id="manualOnBtn" class="btn manual-btn">Manual ON</button>
-
-<button id="manualOffBtn" class="btn manual-btn off">Manual OFF</button>
-
-</div>
-
-</div>
-
-<button id="logoutBtn" class="btn logout-btn">Logout</button>
-
-</div>
-
-</div>
-
-</body>
-</html>
+<script type="module" src="app.js"></script>
 </body>
 </html>
