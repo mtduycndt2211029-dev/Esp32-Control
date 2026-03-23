@@ -1,426 +1,287 @@
-// ===== FIREBASE =====
+const $ = id => document.getElementById(id);
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"
+// Firebase imports (unchanged)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, push, remove, onValue, runTransaction } 
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-import {
-getDatabase,
-ref,
-set,
-onValue
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"
+const firebaseConfig = { apiKey: "AIzaSyA_bXUugzjP7uR_CIrhBdpbkZhg5f2Al5o", authDomain: "esp32-control-e48e5.firebaseapp.com", databaseURL: "https://esp32-control-e48e5-default-rtdb.asia-southeast1.firebasedatabase.app" };
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
 
-import {
-getAuth,
-signInWithEmailAndPassword,
-onAuthStateChanged,
-signOut
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"
+// LOGIN HANDLERS
+$("loginBtn").onclick = async () => {
+  $("loginError").innerText = "";
+  try {
+    await signInWithEmailAndPassword(auth, $("emailField").value, $("passwordField").value);
+  } catch(e) {
+    $("loginError").innerText = e.message;
+  }
+};
+$("logoutBtn").onclick = () => signOut(auth);
 
+onAuthStateChanged(auth, user => {
+  $("authBox").style.display = user ? "none" : "flex";
+  $("app").style.display = user ? "block" : "none";
+});
 
-// ===== FIREBASE CONFIG =====
+// NAVIGATION
+function show(page) {
+  ["dash","chartPage","historyPage"].forEach(id => $(id).style.display = "none");
+  page.style.display = "block";
+}
+$("navDash").onclick = () => show($("dash"));
+$("navChart").onclick = () => show($("chartPage"));
+$("navHistory").onclick = () => show($("historyPage"));
 
-const firebaseConfig = {
-  apiKey: "AIzaSyA_bXUugzjP7uR_CIrhBdpbkZhg5f2Al5o",
-  authDomain: "esp32-control-e48e5.firebaseapp.com",
-  databaseURL: "https://esp32-control-e48e5-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "esp32-control-e48e5",
-  storageBucket: "esp32-control-e48e5.firebasestorage.app",
-  messagingSenderId: "269620601839",
-  appId: "1:269620601839:web:e61addc83962e09b014c1a"
+// CHART SETUP
+const ctx = $("chart").getContext("2d");
+let tArr = [], hArr = [], timeArr = [];
+const chart = new Chart(ctx, {
+  type: "line",
+  data: {
+    labels: timeArr,
+    datasets: [
+      { label: "Temperature", data: tArr, borderColor: "red", fill: false },
+      { label: "Humidity",    data: hArr, borderColor: "blue", fill: false }
+    ]
+  },
+  options: { responsive: true }
+});
+
+// LOG FUNCTION (push new log entry)
+function log(event, value, pwm=null) {
+  const entry = { event, value, pwm, user: auth.currentUser?.email, timestamp: Date.now() };
+  push(ref(db, "ESP32_LOGS"), entry);
+}
+
+// HISTORY TABLE (read from DB)
+let lastLogs = null;
+function updateHistory(data) {
+  const table = $("table");
+  table.innerHTML = "";
+  if(!data) return;
+  // Sort by timestamp descending
+  const rows = Object.values(data).sort((a,b) => b.timestamp - a.timestamp);
+  rows.forEach(r => {
+    const tr = table.insertRow();
+    tr.insertCell().innerText = new Date(r.timestamp).toLocaleString();
+    tr.insertCell().innerText = r.event;
+    tr.insertCell().innerText = r.user;
+    const valCell = tr.insertCell();
+    valCell.innerText = r.value + (r.pwm!==undefined ? ` (PWM:${r.pwm})` : "");
+  });
+}
+onValue(ref(db, "ESP32_LOGS"), snap => {
+  const data = snap.val();
+  if(JSON.stringify(data) !== lastLogs) {
+    lastLogs = JSON.stringify(data);
+    updateHistory(data);
+  }
+});
+
+// FILTER FUNCTIONALITY
+$("filter").onclick = () => {
+  const userF = $("fu").value.toLowerCase();
+  const eventF = $("fe").value.toLowerCase();
+  [...$("table").rows].forEach(row => {
+    const matchEvent = row.cells[1].innerText.toLowerCase().includes(eventF);
+    const matchUser  = row.cells[2].innerText.toLowerCase().includes(userF);
+    row.style.display = (matchEvent && matchUser) ? "" : "none";
+  });
 };
 
+// EXPORT TO EXCEL
+$("export").onclick = () => {
+  const visibleRows = [...$("table").rows].filter(r => r.style.display !== "none");
+  if(visibleRows.length === 0) {
+    alert("No data to export");
+    return;
+  }
+  const rows = visibleRows.map(r => ({
+    Time:  r.cells[0].innerText,
+    Event: r.cells[1].innerText,
+    User:  r.cells[2].innerText,
+    Value: r.cells[3].innerText
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Logs");
+  XLSX.writeFile(wb, "logs.xlsx");
+};
 
-// ===== INIT FIREBASE =====
+// CLEAR HISTORY
+$("clearHistory").onclick = () => {
+  if(confirm("Clear all logs?")) remove(ref(db,"ESP32_LOGS"));
+};
 
-const app = initializeApp(firebaseConfig)
-const db = getDatabase(app)
-const auth = getAuth(app)
+// SENSOR DATA (temperature & humidity)
+onValue(ref(db, "ESP32/SENSOR"), snap => {
+  const d = snap.val();
+  if(!d) return;
+  $("temp").innerText = d.temperature + "°C";
+  $("hum").innerText  = d.humidity + "%";
+  tArr.push(d.temperature);
+  hArr.push(d.humidity);
+  timeArr.push(new Date().toLocaleTimeString());
+  if(tArr.length > 20) { tArr.shift(); hArr.shift(); timeArr.shift(); }
+  chart.update();
+});
 
-let scheduleActive = false
-let scheduleStart = 0
-let scheduleStop = 0
+// TWO-WAY LISTENERS FOR GPIO STATES
+onValue(ref(db, "ESP32/GPIO1/state"), snap => {
+  if(snap.exists()) {
+    $("bulb").className = "bulb " + (snap.val()==="on" ? "on" : "off");
+  }
+});
+onValue(ref(db, "ESP32/GPIO2/state"), snap => {
+  if(snap.exists()) {
+    const on = (snap.val() === "on");
+    g2State = on;
+    $("gpio2Lamp").className = on ? "bulb on" : "bulb off";
+    // Adjust opacity per PWM if lamp is on
+    const pwmVal = parseInt($("pwmSlider").value);
+    $("gpio2Lamp").style.opacity = on ? (pwmVal/255) : 0.2;
+  }
+});
+onValue(ref(db, "ESP32/GPIO2/pwm"), snap => {
+  if(snap.exists()) {
+    const pwm = snap.val();
+    $("pwmSlider").value = pwm;
+    $("pwmValue").innerText = pwm;
+    if(g2State) {
+      $("gpio2Lamp").style.opacity = pwm/255;
+    }
+  }
+});
 
+// GPIO1 CONTROL (no change needed aside from listener above)
+$("g1On").onclick = () => {
+  set(ref(db, "ESP32/GPIO1/state"), "on");
+  $("bulb").className = "bulb on";
+  log("GPIO1","ON");
+};
+$("g1Off").onclick = () => {
+  set(ref(db, "ESP32/GPIO1/state"), "off");
+  $("bulb").className = "bulb off";
+  log("GPIO1","OFF");
+};
 
-// =====================
-// LOGIN UI
-// =====================
+// GPIO2 + PWM + SCHEDULE
+let g2State = false;  // current on/off state
+let mode = "manual";
+let start = 0, stop = 0;
+let lastScheduleState = null;
 
-const authBox = document.getElementById("authBox")
-const controlBox = document.getElementById("controlBox")
+// MODE SWITCH
+$("manualMode").onclick = () => {
+  mode = "manual";
+  $("manualBox").style.display = "block";
+  $("scheduleBox").style.display = "none";
+};
+$("scheduleMode").onclick = () => {
+  mode = "schedule";
+  $("manualBox").style.display = "none";
+  $("scheduleBox").style.display = "block";
+};
 
-const loginBtn = document.getElementById("loginBtn")
-const logoutBtn = document.getElementById("logoutBtn")
-
-const authMsg = document.getElementById("authMsg")
-const badge = document.getElementById("statusBadge")
-
-
-// =====================
-// LOGIN
-// =====================
-
-loginBtn.onclick = async ()=>{
-
-authMsg.innerText=""
-
-try{
-
-await signInWithEmailAndPassword(
-auth,
-document.getElementById("emailField").value,
-document.getElementById("passwordField").value
-)
-
-}catch(e){
-
-authMsg.innerText = e.message
-
+// TIME SELECTORS POPULATION
+for(let i=0; i<24; i++) {
+  $("sh").add(new Option(String(i).padStart(2,'0'), i));
+  $("eh").add(new Option(String(i).padStart(2,'0'), i));
 }
-
+for(let i=0; i<60; i++) {
+  $("sm").add(new Option(String(i).padStart(2,'0'), i));
+  $("em").add(new Option(String(i).padStart(2,'0'), i));
 }
-
-
-// =====================
-// LOGOUT
-// =====================
-
-logoutBtn.onclick = ()=>{
-
-signOut(auth)
-
-}
-
-
-// =====================
-// AUTH STATE
-// =====================
-
-onAuthStateChanged(auth,(user)=>{
-
-if(user){
-
-authBox.style.display="none"
-controlBox.style.display="block"
-
-badge.className="status-badge online"
-badge.innerText="Online"
-
-}else{
-
-authBox.style.display="block"
-controlBox.style.display="none"
-
-badge.className="status-badge offline"
-badge.innerText="Offline"
-
-}
-
-})
-
-
-// ===== UI ELEMENTS =====
-
-const tempValue = document.getElementById("tempValue")
-const humValue = document.getElementById("humValue")
-
-const gpio1Btn = document.getElementById("gpio1Btn")
-const gpio1Status = document.getElementById("gpio1Status")
-
-const gpio2Btn = document.getElementById("gpio2Btn")
-const gpio2Status = document.getElementById("gpio2Status")
-
-const pwmSlider = document.getElementById("pwmSlider")
-const pwmValue = document.getElementById("pwmValue")
-
-const startHour = document.getElementById("startHour")
-const startMin = document.getElementById("startMin")
-const stopHour = document.getElementById("stopHour")
-const stopMin = document.getElementById("stopMin")
-
-const applyBtn = document.getElementById("applyBtn")
-const cancelBtn = document.getElementById("cancelBtn")
-
-const manualOnBtn = document.getElementById("manualOnBtn")
-const manualOffBtn = document.getElementById("manualOffBtn")
-
-const appliedTime = document.getElementById("appliedTime")
-
-
-// =====================
-// SENSOR REALTIME
-// =====================
-
-onValue(ref(db,"ESP32/SENSOR"),(snapshot)=>{
-
-const data = snapshot.val()
-
-if(data){
-
-tempValue.innerText = data.temperature + " °C"
-humValue.innerText = data.humidity + " %"
-
-}
-
-})
-
-
-// =====================
-// REALTIME SCHEDULE
-// =====================
-
-onValue(ref(db,"ESP32/SCHEDULE"),(snapshot)=>{
-
-const data = snapshot.val()
-
-if(!data) return
-
-scheduleActive = data.active
-scheduleStart = data.start
-scheduleStop = data.stop
-
-if(scheduleActive){
-
-const sh = Math.floor(scheduleStart/60).toString().padStart(2,"0")
-const sm = (scheduleStart%60).toString().padStart(2,"0")
-
-const eh = Math.floor(scheduleStop/60).toString().padStart(2,"0")
-const em = (scheduleStop%60).toString().padStart(2,"0")
-
-appliedTime.innerText = `Schedule: ${sh}:${sm} → ${eh}:${em}`
-appliedTime.style.display="block"
-
-}else{
-
-appliedTime.style.display="none"
-
-}
-
-})
-
-
-// =====================
-// TIME DROPDOWN
-// =====================
-
-for(let h=0;h<24;h++){
-
-let opt = new Option(h.toString().padStart(2,"0"),h)
-
-startHour.add(opt.cloneNode(true))
-stopHour.add(opt.cloneNode(true))
-
-}
-
-for(let m=0;m<60;m++){
-
-let opt = new Option(m.toString().padStart(2,"0"),m)
-
-startMin.add(opt.cloneNode(true))
-stopMin.add(opt.cloneNode(true))
-
-}
-
-
-// =====================
-// PWM CONTROL
-// =====================
-
-pwmSlider.addEventListener("input",()=>{
-
-pwmValue.innerText = pwmSlider.value
-
-set(ref(db,"ESP32/GPIO2/pwm"),parseInt(pwmSlider.value))
-
-})
-
-
-// =====================
-// GPIO1 BUTTON
-// =====================
-
-gpio1Btn.onclick = ()=>{
-
-const on = gpio1Btn.classList.toggle("on")
-
-const state = on ? "on":"off"
-
-gpio1Status.innerText = "Status: " + state.toUpperCase()
-
-set(ref(db,"ESP32/GPIO1/state"),state)
-
-}
-
-
-// =====================
-// GPIO2 FUNCTION
-// =====================
-
-function setGPIO2(on){
-
-const state = on ? "on":"off"
-
-if(on){
-
-gpio2Btn.classList.add("on")
-gpio2Status.innerText = "Status: ON"
-
-}else{
-
-gpio2Btn.classList.remove("on")
-gpio2Status.innerText = "Status: OFF"
-
-}
-
-set(ref(db,"ESP32/GPIO2/state"),state)
-
-}
-
-
-// =====================
-// SCHEDULE LOGIC
-// =====================
-
-function updateSchedule(){
-
-if(!scheduleActive) return
-
-const now = new Date()
-
-const current = now.getHours()*60 + now.getMinutes()
-
-let on = false
-
-if(scheduleStart <= scheduleStop){
-
-on = current >= scheduleStart && current < scheduleStop
-
-}
-else{
-
-on = current >= scheduleStart || current < scheduleStop
-
-}
-
-setGPIO2(on)
-
-}
-
-setInterval(updateSchedule,1000)
-
-
-// =====================
+$("g2On").onclick = () => {
+  mode = "manual";
+  setG2(true);
+};
+
+$("g2Off").onclick = () => {
+  mode = "manual";
+  setG2(false);
+};
 // APPLY SCHEDULE
-// =====================
-
-applyBtn.onclick = ()=>{
-
-scheduleStart = parseInt(startHour.value)*60 + parseInt(startMin.value)
-scheduleStop = parseInt(stopHour.value)*60 + parseInt(stopMin.value)
-
-set(ref(db,"ESP32/SCHEDULE"),{
-active:true,
-start:scheduleStart,
-stop:scheduleStop
+$("apply").onclick = () => {
+  start = parseInt($("sh").value)*60 + parseInt($("sm").value);
+  stop  = parseInt($("eh").value)*60 + parseInt($("em").value);
+  const shVal = String($("sh").value).padStart(2,'0');
+  const smVal = String($("sm").value).padStart(2,'0');
+  const ehVal = String($("eh").value).padStart(2,'0');
+  const emVal = String($("em").value).padStart(2,'0');
+  $("scheduleStatus").innerText = `Start: ${shVal}:${smVal}  Stop: ${ehVal}:${emVal}`;
+  mode = "schedule";
+  // Check current time relative to schedule
+  const nowMins = new Date().getHours()*60 + new Date().getMinutes();
+  if(start <= stop) {
+    g2State = (nowMins >= start && nowMins < stop);
+  } else {
+    g2State = (nowMins >= start || nowMins < stop);
+  }
+  set(ref(db,"ESP32/SCHEDULE"),{
+  active: true,
+  start: start,
+  stop: stop
 })
+  setG2(g2State);
+  log("SCHEDULE", `${shVal}:${smVal}→${ehVal}:${emVal}`, $("pwmSlider").value);
+};
 
-}
-
-
-// =====================
 // CANCEL SCHEDULE
-// =====================
+$("cancel").onclick = () => {
+  mode = "manual";
+  $("scheduleStatus").innerText = "";
+  setG2(false);
+  log("SCHEDULE","CANCEL");
+  set(ref(db,"ESP32/SCHEDULE/active"),false)
+};
 
-cancelBtn.onclick = ()=>{
+// SCHEDULE INTERVAL LOOP
+setInterval(() => {
+  if(mode !== "schedule") return;
+  const now = new Date();
+  const cur = now.getHours()*60 + now.getMinutes();
+  let on = false;
+  if(start <= stop) {
+    on = (cur >= start && cur < stop);
+  } else {
+    on = (cur >= start || cur < stop);
+  }
+  if(on !== lastScheduleState) {
+    lastScheduleState = on;
+    setG2(on);
+  }
+}, 1000);
 
-set(ref(db,"ESP32/SCHEDULE/active"),false)
-appliedTime.style.display="none"
+// SET GPIO2 FUNCTION WITH GUARD
+function setG2(on) {
+  const pwm = parseInt($("pwmSlider").value);
 
-setGPIO2(false)
+  g2State = on;
+
+  $("gpio2Lamp").className = on ? "bulb on" : "bulb off";
+  $("gpio2Lamp").style.opacity = on ? (pwm/255) : 0.2;
+
+  set(ref(db, "ESP32/GPIO2/state"), on ? "on" : "off");
+  set(ref(db, "ESP32/GPIO2/pwm"), pwm);
+
+  log("GPIO2", on ? "ON" : "OFF", pwm);
 }
 
-
-// =====================
-// MANUAL CONTROL
-// =====================
-
-manualOnBtn.onclick = ()=>{
-
-setGPIO2(true)
-
-set(ref(db,"ESP32/SCHEDULE/active"),false)
-
-}
-
-manualOffBtn.onclick = ()=>{
-
-setGPIO2(false)
-
-set(ref(db,"ESP32/SCHEDULE/active"),false)
-
-}
-
-
-// =====================
-// REALTIME GPIO1
-// =====================
-
-onValue(ref(db,"ESP32/GPIO1/state"),(snapshot)=>{
-
-const state = snapshot.val()
-
-if(state === "on"){
-
-gpio1Btn.classList.add("on")
-gpio1Status.innerText = "Status: ON"
-
-}else{
-
-gpio1Btn.classList.remove("on")
-gpio1Status.innerText = "Status: OFF"
-
-}
-
-})
-
-
-// =====================
-// REALTIME GPIO2
-// =====================
-
-onValue(ref(db,"ESP32/GPIO2/state"),(snapshot)=>{
-
-const state = snapshot.val()
-
-if(state === "on"){
-
-gpio2Btn.classList.add("on")
-gpio2Status.innerText = "Status: ON"
-
-}else{
-
-gpio2Btn.classList.remove("on")
-gpio2Status.innerText = "Status: OFF"
-
-}
-
-})
-
-
-// =====================
-// REALTIME PWM
-// =====================
-
-onValue(ref(db,"ESP32/GPIO2/pwm"),(snapshot)=>{
-
-const val = snapshot.val()
-
-if(val!=null){
-
-pwmSlider.value = val
-pwmValue.innerText = val
-
-}
-
-})
-
-
+// PWM SLIDER (debounced)
+let pwmTimeout = null;
+$("pwmSlider").oninput = () => {
+  const val = $("pwmSlider").value;
+  $("pwmValue").innerText = val;
+  if(g2State) {
+    clearTimeout(pwmTimeout);
+    pwmTimeout = setTimeout(() => {
+      setG2(true);
+    }, 100);
+  }
+};
