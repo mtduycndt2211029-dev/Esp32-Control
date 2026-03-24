@@ -49,7 +49,27 @@ const chart = new Chart(ctx, {
       { label: "Humidity",    data: hArr, borderColor: "blue", fill: false }
     ]
   },
-  options: { responsive: true }
+ options: {
+  responsive: true,
+  scales: {
+    x: {
+      grid: {
+        color: "rgba(200, 200, 200, 0.3)" // xám nhạt
+      },
+      ticks: {
+        color: "#ccc" // màu chữ trục
+      }
+    },
+    y: {
+      grid: {
+        color: "rgba(200, 200, 200, 0.3)"
+      },
+      ticks: {
+        color: "#ccc"
+      }
+    }
+  }
+}
 });
 
 // LOG FUNCTION (push new log entry)
@@ -127,7 +147,7 @@ onValue(ref(db, "ESP32/SENSOR"), snap => {
   tArr.push(d.temperature);
   hArr.push(d.humidity);
   timeArr.push(new Date().toLocaleTimeString());
-  if(tArr.length > 20) { tArr.shift(); hArr.shift(); timeArr.shift(); }
+  if(tArr.length > 500) { tArr.shift(); hArr.shift(); timeArr.shift(); }
   chart.update();
 });
 
@@ -285,3 +305,21 @@ $("pwmSlider").oninput = () => {
     }, 100);
   }
 };
+$("exportChart").onclick = () => {
+  if(timeArr.length === 0){
+    alert("No chart data!");
+    return;
+  }
+
+  const rows = timeArr.map((t, i) => ({
+    Time: t,
+    Temperature: tArr[i],
+    Humidity: hArr[i]
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "ChartData");
+
+  XLSX.writeFile(wb, "chart_data.xlsx");
+}; 
