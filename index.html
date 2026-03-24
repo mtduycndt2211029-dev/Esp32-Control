@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ESP32 Dashboard</title>
 
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="style.css">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -91,6 +91,9 @@
   </div>
 
   <div id="chartPage" class="page" style="display:none;">
+    <div class="btn-group center">
+  <button id="exportChart">Export Chart</button>
+</div>
     <canvas id="chart"></canvas>
   </div>
 
